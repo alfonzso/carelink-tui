@@ -25,16 +25,18 @@ echo '' >/tmp/all_curl_resp
 
 : ${CL_USER_NAME:?Needed...}
 : ${CL_USER_PASSWORD:?Needed...}
+: ${CL_COUNTRY:?Needed...}
+: ${CL_LANGUAGE:?Needed...}
 
 function get_token() {
 
-    _curl -L 'https://carelink.minimed.eu/patient/sso/login?country=hu&lang=en'
+    _curl -L "https://carelink.minimed.eu/patient/sso/login?country=$CL_COUNTRY&lang=$CL_LANGUAGE"
 
     state=$(cat /tmp/curl_resp | grep 'name="state"' | tr -d '>"' | cut -d= -f4)
     # echo $state
 
-    _curl 'https://carelink-login.minimed.eu/u/login?state='$state'&ui_locales=en' \
-        --data-raw 'state='$state'&username='$CL_USER_NAME'&password='$CL_USER_PASSWORD'&action=default'
+    _curl "https://carelink-login.minimed.eu/u/login?state=$state&ui_locales=en" \
+        --data-raw "state=$state&username=$CL_USER_NAME&password=$CL_USER_PASSWORD&action=default"
 
     location=$(cat /tmp/curl_resp | grep resume | grep -oP 'location: /\K.*$')
     # echo $location
