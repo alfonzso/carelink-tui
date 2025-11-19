@@ -1,2 +1,5 @@
 cookie_jar.txt
 .env
+/.ropeproject/
+/.venv/
+/py_cookie_jar

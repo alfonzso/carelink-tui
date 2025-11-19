@@ -7,7 +7,7 @@ function _curl() {
         -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) FxQuantum/144.0 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15' >/tmp/_curl_resp 2>&1
 
     cat /tmp/_curl_resp | tr -d '\r' >/tmp/curl_resp
-    # cat /tmp/curl_resp | tee -a /tmp/all_curl_resp
+    cat /tmp/curl_resp | tee -a /tmp/all_curl_resp
 }
 
 function get_exp_date() {
