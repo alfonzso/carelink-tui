@@ -1,12 +1,19 @@
+import base64
+import json
 import os
 import pickle
 import re
+from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
 import requests
 from requests.models import Response
 from requests.sessions import Session
+
+
+def get_epoch() -> int:
+    return int(datetime.now().timestamp())
 
 
 def grep(source: str, search: str):
@@ -47,41 +54,131 @@ class CareLink:
     _session: Session
     _cl_vars: CLVars
 
+    class RequestObj:
+        method: REQMETHOD
+        headers: dict
+        url: str
+        data_raw: str
+        allow_redirect: bool
+
+        def __init__(self, _u: str, _dw: str = "", _ar: bool = True):
+            self.method = REQMETHOD.GET
+            self.headers = {}
+            self.url = _u
+            self.data_raw = _dw
+            self.allow_redirect = _ar
+
+        def Get(self):
+            self.method = REQMETHOD.GET
+            return self
+
+        def Post(self):
+            self.method = REQMETHOD.POST
+            return self
+
+        def Headers(self, headers: dict):
+            self.headers = headers
+            return self
+
+        def do(self) -> Self:
+            return self
+
+    def create_params(self, _params_dict: dict):
+        return "&".join([f"{k}={v}" for k, v in _params_dict.items()])
+
+    def carelink_patient_login(self):
+        _url_params = self.create_params(
+            {
+                "country": self._cl_vars.country,
+                "lang": self._cl_vars.language,
+            }
+        )
+        _req_obj = (
+            self.RequestObj(
+                f"https://carelink.minimed.eu/patient/sso/login?{_url_params}"
+            )
+            .Get()
+            .do()
+        )
+        return self.send_request(_req_obj)
+
+    def carelink_u_login(self):
+        _url_params = self.create_params(
+            {"state": self._storage["state"], "ui_locales": "en"}
+        )
+        _data_raw = self.create_params(
+            {
+                "state": self._storage["state"],
+                "username": self._cl_vars.user_name,
+                "password": self._cl_vars.user_password,
+                "action": "default",
+            }
+        )
+        _req_obj = (
+            self.RequestObj(
+                f"https://carelink-login.minimed.eu/u/login?{_url_params}",
+                _data_raw,
+                False,
+            )
+            .Post()
+            .Headers({"Content-type": "application/x-www-form-urlencoded"})
+            .do()
+        )
+        return self.send_request(_req_obj)
+
+    def carelink_resume(self, _resp: Response):
+        _req_obj = (
+            self.RequestObj(
+                f"https://carelink-login.minimed.eu/{_resp.headers.get("location")}"
+            )
+            .Get()
+            .do()
+        )
+
+        return self.send_request(_req_obj)
+
+    def carelink_patient_data(self):
+
+        if self.auth_token is None:
+            raise ValueError("Auth token was None...")
+
+        _req_obj = (
+            self.RequestObj(
+                "https://clcloud.minimed.eu/patient/connect/data",
+            )
+            .Get()
+            .Headers(
+                {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.auth_token}",
+                }
+            )
+            .do()
+        )
+        return self.send_request(_req_obj)
+
     def save_cookie(self):
         with open("py_cookie_jar", "wb") as f:
             pickle.dump(self._session.cookies, f)
 
-    def send_request(self, url: str, method=REQMETHOD.GET, data_raw="", follow=True):
-        print(data_raw)
-        # _req = session.request(method.value, url, data=data_raw, allow_redirects=False)
-        if not follow:
-            self._session.headers.update(
-                {"Content-type": "application/x-www-form-urlencoded"}
-            )
-
-        _req = self._session.request(
-            method.value, url, data=data_raw, allow_redirects=follow
+    def send_request(self, obj: RequestObj):
+        _response = self._session.request(
+            method=obj.method.value,
+            url=obj.url,
+            data=obj.data_raw,
+            allow_redirects=obj.allow_redirect,
+            headers=obj.headers,
         )
         self.save_cookie()
-        print(_req)
+        return _response
 
-        _location = _req.headers.get("location", None)
-        if _location:
-            self._storage["location"] = _location
-
-        return _req
-
-    def get_state(self, _req: Response):
-        to_storage: dict[str, str | None] = {}
-        for g in grep(_req.text, 'name="state"'):
-            ggg = re.sub("\\s+", " ", re.sub('[<>"]', "", g)).split(" ")
-            for _gi in ggg:
-                try:
-                    k, v = _gi.split("=")
-                except ValueError:
-                    k, v = _gi, None
-                to_storage.update({k: v})
-        self._storage["state"] = to_storage
+    def get_state(self, _resp: Response):
+        for _grep_res in grep(_resp.text, 'name="state"'):
+            search_res = re.search('value="(\\w+)"', _grep_res)
+            if search_res:
+                self._storage["state"] = search_res.group(1)
+                return True
+        return False
 
     def set_env(self):
         _user_name = os.getenv("CL_USER_NAME", None)
@@ -92,6 +189,26 @@ class CareLink:
             print("Mandatory env vars are empty")
             os._exit(1)
         self._cl_vars = CLVars(_user_name, _user_password, _country, _lang)
+
+    def get_auth_token(self):
+        _cookies = self._session.cookies
+        for cookie in _cookies:
+            if cookie.name == "auth_tmp_token":
+                return cookie.value
+        return None
+
+    def is_token_expired(self, token: str):
+        if token is None:
+            return True
+        token_in_3 = token.split(".")
+        if not len(token_in_3) == 3:
+            return True
+
+        exp = json.loads(base64.b64decode(token_in_3[1] + "==")).get("exp", None)
+        if exp is None:
+            return True
+
+        return (int(exp) - get_epoch()) // 60 < 0
 
     def main(self):
         self.set_env()
@@ -106,30 +223,20 @@ class CareLink:
             with open("py_cookie_jar", "rb") as f:
                 self._session.cookies.update(pickle.load(f))
 
-        _url = f"https://carelink.minimed.eu/patient/sso/login?country={self._cl_vars.country}&lang={self._cl_vars.language}"
-        _req = self.send_request(_url)
+        is_expired = self.is_token_expired(self.get_auth_token())
 
-        self.get_state(_req)
+        if is_expired:
+            # full monad here
+            self.get_state(self.carelink_patient_login())
+            self.carelink_resume(self.carelink_u_login())
 
-        _url_params = [f"state={self._storage['state']['value']}", "ui_locales=en"]
-        _data_raw_params = [
-            f"state={self._storage['state']['value']}",
-            f"username={self._cl_vars.user_name}",
-            f"password={self._cl_vars.user_password}",
-            "action=default",
-        ]
+        self.auth_token = self.get_auth_token()
+        pat_data = self.carelink_patient_data()
 
-        _url = f"https://carelink-login.minimed.eu/u/login?{'&'.join(_url_params)}"
-        self.send_request(_url, REQMETHOD.POST, "&".join(_data_raw_params), False)
-
-        _url = f"https://carelink-login.minimed.eu/{self._storage['location']}"
-        _req = self.send_request(_url)
-
-        print(_req.headers)
-        print(self._session.cookies)
+        curr_bs = (pat_data.json().get("sgs")[-1]).get("sg") // 18
+        print(curr_bs)
 
 
 if __name__ == "__main__":
     cl = CareLink()
     cl.main()
-
