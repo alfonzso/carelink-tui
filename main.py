@@ -83,6 +83,19 @@ class CareLink:
         def do(self) -> Self:
             return self
 
+    def __init__(self):
+        self.set_env()
+
+        self._session = requests.session()
+        self._session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) FxQuantum/144.0 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15"
+            }
+        )
+        if os.path.exists("py_cookie_jar"):
+            with open("py_cookie_jar", "rb") as f:
+                self._session.cookies.update(pickle.load(f))
+
     def create_params(self, _params_dict: dict):
         return "&".join([f"{k}={v}" for k, v in _params_dict.items()])
 
@@ -221,18 +234,6 @@ class CareLink:
         return (int(exp) - get_epoch()) // 60 < 0
 
     def main(self):
-        self.set_env()
-
-        self._session = requests.session()
-        self._session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) FxQuantum/144.0 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15"
-            }
-        )
-        if os.path.exists("py_cookie_jar"):
-            with open("py_cookie_jar", "rb") as f:
-                self._session.cookies.update(pickle.load(f))
-
         is_expired = self.is_token_expired(self.get_auth_token())
 
         if is_expired:
@@ -242,10 +243,6 @@ class CareLink:
 
         self.auth_token = self.get_auth_token()
         self.patient_data = self.carelink_patient_data()
-
-        # curr_bs = (pat_data.json().get("sgs")[-1]).get("sg") // 18
-        # print(curr_bs)
-
 
 if __name__ == "__main__":
     cl = CareLink()
