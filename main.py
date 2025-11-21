@@ -171,14 +171,18 @@ class CareLink:
         return self.send_request(_req_obj)
 
     def carelink_get_last_n__blood_sugar_data(self, n=10):
+        print(datetime.now(), "LOG: get last n")
         sgs = self.patient_data.json().get("sgs")[n * -1 :]
         for sg in sgs:
-            sg['datetime'] = int(datetime.fromisoformat(sg.get("datetime", "")).timestamp())
+            sg["datetime"] = int(
+                datetime.fromisoformat(sg.get("datetime", "")).timestamp()
+            )
             sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
         return sgs
 
     def carelink_get_current_blood_sugar_level(self):
-        return (self.patient_data.json().get("sgs")[-1]).get("sg") // 18
+        print(datetime.now(), "LOG: get current bs")
+        return round((self.patient_data.json().get("sgs")[-1]).get("sg") / 18, 1)
 
     def save_cookie(self):
         with open("py_cookie_jar", "wb") as f:
@@ -243,6 +247,7 @@ class CareLink:
 
         self.auth_token = self.get_auth_token()
         self.patient_data = self.carelink_patient_data()
+
 
 if __name__ == "__main__":
     cl = CareLink()
