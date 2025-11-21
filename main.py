@@ -157,6 +157,16 @@ class CareLink:
         )
         return self.send_request(_req_obj)
 
+    def carelink_get_last_n__blood_sugar_data(self, n=10):
+        sgs = self.patient_data.json().get("sgs")[n * -1 :]
+        for sg in sgs:
+            sg['datetime'] = int(datetime.fromisoformat(sg.get("datetime", "")).timestamp())
+            sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
+        return sgs
+
+    def carelink_get_current_blood_sugar_level(self):
+        return (self.patient_data.json().get("sgs")[-1]).get("sg") // 18
+
     def save_cookie(self):
         with open("py_cookie_jar", "wb") as f:
             pickle.dump(self._session.cookies, f)
@@ -231,12 +241,15 @@ class CareLink:
             self.carelink_resume(self.carelink_u_login())
 
         self.auth_token = self.get_auth_token()
-        pat_data = self.carelink_patient_data()
+        self.patient_data = self.carelink_patient_data()
 
-        curr_bs = (pat_data.json().get("sgs")[-1]).get("sg") // 18
-        print(curr_bs)
+        # curr_bs = (pat_data.json().get("sgs")[-1]).get("sg") // 18
+        # print(curr_bs)
 
 
 if __name__ == "__main__":
     cl = CareLink()
     cl.main()
+    last_n = cl.carelink_get_last_n__blood_sugar_data()
+    current_bs = cl.carelink_get_current_blood_sugar_level()
+    print(last_n, current_bs)
