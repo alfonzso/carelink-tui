@@ -170,13 +170,15 @@ class CareLink:
         )
         return self.send_request(_req_obj)
 
-    def carelink_get_last_n__blood_sugar_data(self, n=10):
+    def carelink_get_last_n_blood_sugar_data(self, n=10):
         print(datetime.now(), "LOG: get last n")
         sgs = self.patient_data.json().get("sgs")[n * -1 :]
         for sg in sgs:
-            sg["datetime"] = int(
-                datetime.fromisoformat(sg.get("datetime", "")).timestamp()
-            )
+            _datetime = sg.get("datetime", None)
+            if _datetime:
+                sg["datetime"] = int(
+                    datetime.fromisoformat(_datetime).timestamp()
+                )
             sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
         return sgs
 
@@ -252,6 +254,6 @@ class CareLink:
 if __name__ == "__main__":
     cl = CareLink()
     cl.main()
-    last_n = cl.carelink_get_last_n__blood_sugar_data()
+    last_n = cl.carelink_get_last_n_blood_sugar_data()
     current_bs = cl.carelink_get_current_blood_sugar_level()
     print(last_n, current_bs)

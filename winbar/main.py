@@ -1,5 +1,6 @@
 # appbar_with_tray.py -- Windows only
 import ctypes
+import math
 import signal
 import sys
 import time
@@ -38,9 +39,10 @@ class APPBARDATA(ctypes.Structure):
 index = 0
 cl = CareLink()
 cl.main()
-last_n_cache = [
-    sgs.get("sg", 0) for sgs in cl.carelink_get_last_n__blood_sugar_data(12)
-]
+last_n_cache = []
+# [
+#     sgs.get("sg", 0) for idx, sgs in enumerate(cl.carelink_get_last_n_blood_sugar_data(45)) if idx % 2 == 0
+# ]
 
 ###########################################
 ###########################################
@@ -131,13 +133,9 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         self.update()
 
     def paintEvent(self, event):
-        # global cl
         global last_n_cache
-        # global last_n_cache
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
-        # optional: draw rectangle border (uncomment if needed)
-        # p.setPen(QtGui.QPen(QtGui.QColor(255,255,255,30)))
 
         pen = QtGui.QPen()
         pen.setWidth(2)
@@ -149,56 +147,16 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         p.drawRect(0, 0, self._w - 1, self._h - 1)
         p.setBrush(self._dot_color)
 
-        # p.drawRect(0,0,self._w-1,self._h-1)
+        _distance = 2.5
+        _sgs_in_view = last_n_cache[math.floor(self._w // _distance) * -1 :]
+        n = [
+            ((idx + 1) * _distance, self._h - _sg * 2)
+            for idx, _sg in enumerate(_sgs_in_view)
+        ]
 
-        # number of points = min(width, height) to space evenly along diagonals
-        # if index > 60 * 2 or index == 0:
-        # last_n_cache = [ sgs.get('sg',0) for sgs in cl.carelink_get_last_n__blood_sugar_data(12)]
-        # _n = [
-        #         3,
-        #         4.3,
-        #         5.4,
-        #         6.4,
-        #         8.4,
-        #         9.4,
-        #         10.4,
-        #         12.4,
-        #         16.4,
-        #         9.4,
-        #         5.4,
-        #         4.4,
-        #      ]
-        # _n = [ -9,-8,-7,-6,-5,-4,-3,-2,-1,0, 1,2,3,4,5,6,7,8,9 ]
-        # _n = [ -9,9 ]
-        # n = [ (self._h - x,(idx+1)*5) for idx,x in enumerate(_n) ]
-        # n = [ (self._h - x, idx ) for idx,x in enumerate(_n) ]
-
-        # n = [ ((idx+1)*3, self._h - x ) for idx,x in enumerate(_n) ]
-        n = [((idx + 1) * 2.5, self._h - x * 2) for idx, x in enumerate(last_n_cache)]
-
-        # n = [ ( idx, x ) for idx,x in enumerate(_n) ]
-        # n = [ ( 9,9 ), (1,1), (-9,-9) ]
-        # n = [ (1, self._h -3), ( 9.2, 9.3 ), (15.1,10.8) ]
-        # n = max(2, min(self._w, self._h))
-        # for i in range(n):
-        # print(n)
-        # print(self._h)
         for i in n:
-            # compute evenly spaced coordinates along each diagonal
-            # scale i to full width/height range
-            # x = int(round(i * (self._w - 1) / (n - 1)))
-            # y = int(round(i * (self._h - 1) / (n - 1)))
-            x, y = i
-            # draw dot on main diagonal (top-left -> bottom-right)
-            cx = x + 0.5  # center pixel coordinate
-            cy = y + 0.5
-            # p.drawEllipse(QtCore.QPointF(cx, cy), self._dot_radius, self._dot_radius)
+            x, y, *ignore = i
             p.drawPoint(QtCore.QPointF(x, y))
-
-            # draw dot on opposite diagonal (top-right -> bottom-left)
-            # ox = (self._w - 1 - x) + 0.5
-            # oy = y + 0.5
-            # p.drawEllipse(QtCore.QPointF(ox, oy), self._dot_radius, self._dot_radius)
 
         p.end()
 
@@ -435,12 +393,23 @@ def main():
         bar.widgets[1].setText(f"RAM\n{ram:.0f}%")
         bar.widgets[2].setText("\n".join(current_time.split(":")))
 
+        def scale_last_n(src, step):
+            for x in range(0, len(src) - step, step):
+                yield round(sum(src[x : x + step]) / step, 1)
+
         if index >= 60 * 2 or index == 0:
             cl.main()
             current_bs = cl.carelink_get_current_blood_sugar_level()
-            last_n_cache = [
-                sgs.get("sg", 0) for sgs in cl.carelink_get_last_n__blood_sugar_data(12)
-            ]
+            last_n_cache = list(
+                scale_last_n(
+                    [
+                        sgs.get("sg", 0)
+                        # 46 => 46*4 = 3h 4 min, show last 3h data
+                        for sgs in cl.carelink_get_last_n_blood_sugar_data(46)
+                    ],
+                    2,
+                )
+            )
             bar.widgets[3].setText(str(current_bs))
             bar.widgets[4].update()
             index = 0
@@ -452,6 +421,14 @@ def main():
     timer.start(1000)
 
     sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
