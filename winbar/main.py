@@ -116,21 +116,20 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         parent=None,
     ):
         super().__init__(parent)
+        self._last_n = []
         self._w = int(width_px - 5)
         self._h = int(height_px)
         self._dot_color = QtGui.QColor(dot_color)
-        self._dot_radius = float(dot_radius)
+        # self._dot_radius = float(dot_radius)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        # keep fixed logical size (use scaled if your bar uses larger DPI)
         self.setFixedSize(self._w, self._h)
 
-    def set_dot_color(self, qcolor):
-        self._dot_color = QtGui.QColor(qcolor)
+    def set_sg(self, _last_n):
+        self._last_n = _last_n
         self.update()
 
-    def set_dot_radius(self, r):
-        self._dot_radius = float(r)
-        self.update()
+    def get_w_h(self):
+        return self._w, self._h
 
     def paintEvent(self, event):
         global last_n_cache
@@ -147,14 +146,7 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         p.drawRect(0, 0, self._w - 1, self._h - 1)
         p.setBrush(self._dot_color)
 
-        _distance = 2.5
-        _sgs_in_view = last_n_cache[math.floor(self._w // _distance) * -1 :]
-        n = [
-            ((idx + 1) * _distance, self._h - _sg * 2)
-            for idx, _sg in enumerate(_sgs_in_view)
-        ]
-
-        for i in n:
+        for i in self._last_n:
             x, y, *ignore = i
             p.drawPoint(QtCore.QPointF(x, y))
 
@@ -255,11 +247,18 @@ class TopBarWindow(QtWidgets.QWidget):
         # circle = CircleWidget(diameter=max(12, self.thickness - 12), color=QtGui.QColor("white"))
         # layout.addWidget(circle)
 
-        diag = DiagonalDotsWidget(
-            width_px=40, height_px=40, dot_color=QtGui.QColor("white"), dot_radius=1.5
+        diag_3h = DiagonalDotsWidget(
+            width_px=40, height_px=40, dot_color=QtGui.QColor("white")
         )
-        self.widgets.append(diag)
-        layout.addWidget(diag)
+        diag_3m = DiagonalDotsWidget(
+            width_px=40, height_px=40, dot_color=QtGui.QColor("white")
+        )
+
+        self.widgets.append(diag_3h)
+        self.widgets.append(diag_3m)
+
+        layout.addWidget(diag_3h)
+        layout.addWidget(diag_3m)
 
         layout.addStretch()
         self.setLayout(layout)
@@ -374,7 +373,7 @@ def main():
 
     def update_status():
         global index
-        global last_n_cache
+        # global last_n_cache
         global cl
         """Update system status"""
         # while True:
@@ -393,25 +392,37 @@ def main():
         bar.widgets[1].setText(f"RAM\n{ram:.0f}%")
         bar.widgets[2].setText("\n".join(current_time.split(":")))
 
+        def kek(_width, _height, _last_n=46, _scale=2, _distance=2.5):
+            if _scale == -1:
+                last_n_cache = get_sg_list(_last_n)
+            else:
+                last_n_cache = list(scale_last_n(get_sg_list(_last_n), _scale))
+            _sgs_in_view = last_n_cache[math.floor(_width // _distance) * -1 :]
+            return [
+                ((idx + 1) * _distance, _height - _sg * 2)
+                for idx, _sg in enumerate(_sgs_in_view)
+            ]
+
+        def get_sg_list(_last_n=46):
+            return [
+                sgs.get("sg", 0)
+                for sgs in cl.carelink_get_last_n_blood_sugar_data(_last_n)
+            ]
+
         def scale_last_n(src, step):
             for x in range(0, len(src) - step, step):
                 yield round(sum(src[x : x + step]) / step, 1)
 
         if index >= 60 * 2 or index == 0:
             cl.main()
+            _diag_3h = bar.widgets[4]
+            _diag_3m = bar.widgets[5]
             current_bs = cl.carelink_get_current_blood_sugar_level()
-            last_n_cache = list(
-                scale_last_n(
-                    [
-                        sgs.get("sg", 0)
-                        # 46 => 46*4 = 3h 4 min, show last 3h data
-                        for sgs in cl.carelink_get_last_n_blood_sugar_data(46)
-                    ],
-                    2,
-                )
-            )
             bar.widgets[3].setText(str(current_bs))
-            bar.widgets[4].update()
+
+            _diag_3h.set_sg(kek(*_diag_3h.get_w_h()))
+            _diag_3m.set_sg(kek(*_diag_3h.get_w_h(), 10, -1, 2))
+
             index = 0
         index += 1
 
