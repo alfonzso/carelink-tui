@@ -39,7 +39,7 @@ class APPBARDATA(ctypes.Structure):
 index = 0
 cl = CareLink()
 cl.main()
-last_n_cache = []
+last_46_sg = []
 # [
 #     sgs.get("sg", 0) for idx, sgs in enumerate(cl.carelink_get_last_n_blood_sugar_data(45)) if idx % 2 == 0
 # ]
@@ -132,7 +132,7 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         return self._w, self._h
 
     def paintEvent(self, event):
-        global last_n_cache
+        global last_46_sg
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
 
@@ -146,42 +146,15 @@ class DiagonalDotsWidget(QtWidgets.QWidget):
         p.drawRect(0, 0, self._w - 1, self._h - 1)
         p.setBrush(self._dot_color)
 
+        def _shift():
+            __w, _ = self._last_n[-1]
+            return (self._w - __w ) // 2
+
         for i in self._last_n:
-            x, y, *ignore = i
-            p.drawPoint(QtCore.QPointF(x, y))
+            x , y, *ignore = i
+            p.drawPoint(QtCore.QPointF(x + _shift(), y))
 
         p.end()
-
-
-class CircleWidget(QtWidgets.QWidget):
-    def __init__(self, diameter=20, color=QtGui.QColor("white"), parent=None):
-        super().__init__(parent)
-        self._diameter = int(diameter)
-        self._color = QtGui.QColor(color)
-        # transparent background so it blends into the bar
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        # keep a fixed logical size (you can adjust to fit bar)
-        self.setFixedSize(self._diameter, self._diameter)
-
-    def set_color(self, color):
-        self._color = QtGui.QColor(color)
-        self.update()
-
-    def set_diameter(self, diameter):
-        self._diameter = int(diameter)
-        self.setFixedSize(self._diameter, self._diameter)
-        self.update()
-
-    def paintEvent(self, event):
-        r = self.rect()
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(self._color)
-        # draw circle centered in the widget, with slight padding
-        pad = max(0, self._diameter // 12)
-        rect = r.adjusted(pad, pad, -pad, -pad)
-        painter.drawEllipse(rect)
 
 
 # ---------------- Qt AppBar window ----------------
@@ -250,15 +223,15 @@ class TopBarWindow(QtWidgets.QWidget):
         diag_3h = DiagonalDotsWidget(
             width_px=40, height_px=40, dot_color=QtGui.QColor("white")
         )
-        diag_3m = DiagonalDotsWidget(
+        diag_1h = DiagonalDotsWidget(
             width_px=40, height_px=40, dot_color=QtGui.QColor("white")
         )
 
         self.widgets.append(diag_3h)
-        self.widgets.append(diag_3m)
+        self.widgets.append(diag_1h)
 
         layout.addWidget(diag_3h)
-        layout.addWidget(diag_3m)
+        layout.addWidget(diag_1h)
 
         layout.addStretch()
         self.setLayout(layout)
@@ -373,41 +346,43 @@ def main():
 
     def update_status():
         global index
-        # global last_n_cache
         global cl
         """Update system status"""
-        # while True:
-        # try:
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
         current_time = time.strftime("%H:%M:%S")
 
-        # self.cpu_label.config(text=f"CPU: {cpu:.1f}%")
-        # self.ram_label.config(text=f"")
-        # self.time_label.config(text=current_time)
-
-        # Update window title with info
-        # self.root.title(f"Status Bar - CPU: {cpu:.1f}% | RAM: {ram:.1f}%")
         bar.widgets[0].setText(f"CPU\n{cpu:.0f}%")
         bar.widgets[1].setText(f"RAM\n{ram:.0f}%")
         bar.widgets[2].setText("\n".join(current_time.split(":")))
 
-        def kek(_width, _height, _last_n=46, _scale=2, _distance=2.5):
-            if _scale == -1:
-                last_n_cache = get_sg_list(_last_n)
-            else:
-                last_n_cache = list(scale_last_n(get_sg_list(_last_n), _scale))
-            _sgs_in_view = last_n_cache[math.floor(_width // _distance) * -1 :]
+        def kek(_width, _height, _last_n=[], _scale=2, _distance=2.5):
+            if _scale != -1:
+                _last_n = list(scale_last_n(_last_n, _scale))
+            _sgs_in_view = _last_n[math.floor(_width // _distance) * -1 :]
             return [
                 ((idx + 1) * _distance, _height - _sg * 2)
                 for idx, _sg in enumerate(_sgs_in_view)
             ]
 
-        def get_sg_list(_last_n=46):
-            return [
+        def get_sg_list(_last_n=[]):
+            """
+            get last data from list, example: last_n=[ 46 , 10 ]
+            then we get 46 data and return last 10 from the 46 ...
+            """
+            _max = max(_last_n)
+            _last_n_res = [
                 sgs.get("sg", 0)
-                for sgs in cl.carelink_get_last_n_blood_sugar_data(_last_n)
+                for sgs in cl.carelink_get_last_n_blood_sugar_data(_max)
             ]
+
+            def _calc():
+                for last in _last_n:
+                    if last == _max:
+                        continue
+                    yield _last_n_res[last * -1 :]
+
+            return _last_n_res, *_calc()
 
         def scale_last_n(src, step):
             for x in range(0, len(src) - step, step):
@@ -416,12 +391,13 @@ def main():
         if index >= 60 * 2 or index == 0:
             cl.main()
             _diag_3h = bar.widgets[4]
-            _diag_3m = bar.widgets[5]
+            _diag_1h = bar.widgets[5]
             current_bs = cl.carelink_get_current_blood_sugar_level()
             bar.widgets[3].setText(str(current_bs))
 
-            _diag_3h.set_sg(kek(*_diag_3h.get_w_h()))
-            _diag_3m.set_sg(kek(*_diag_3h.get_w_h(), 10, -1, 2))
+            last_46_sg, last_15_sg = get_sg_list([45, 15])
+            _diag_3h.set_sg(kek(*_diag_3h.get_w_h(), last_46_sg))
+            _diag_1h.set_sg(kek(*_diag_1h.get_w_h(), last_15_sg, -1, 1))
 
             index = 0
         index += 1
