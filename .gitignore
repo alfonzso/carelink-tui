@@ -1,3 +1,6 @@
 cookie_jar.txt
 /.ropeproject/
 /py_cookie_jar
+.env
+.venv
+logindata.json

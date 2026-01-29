@@ -176,9 +176,7 @@ class CareLink:
         for sg in sgs:
             _datetime = sg.get("datetime", None)
             if _datetime:
-                sg["datetime"] = int(
-                    datetime.fromisoformat(_datetime).timestamp()
-                )
+                sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
             sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
         return sgs
 
@@ -217,6 +215,10 @@ class CareLink:
         if None in [_user_name, _user_password, _country, _lang]:
             print("Mandatory env vars are empty")
             os._exit(1)
+        assert _user_name
+        assert _user_password
+        assert _country
+        assert _lang
         self._cl_vars = CLVars(_user_name, _user_password, _country, _lang)
 
     def get_auth_token(self):
@@ -226,7 +228,7 @@ class CareLink:
                 return cookie.value
         return None
 
-    def is_token_expired(self, token: str):
+    def is_token_expired(self, token: str | None):
         if token is None:
             return True
         token_in_3 = token.split(".")
