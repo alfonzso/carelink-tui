@@ -50,7 +50,7 @@ import json
 import logging as log
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import requests
 
@@ -430,6 +430,7 @@ class CareLinkClient(object):
     ###########################################################
     def getRecentData(self):
         # Check if access token is valid
+
         if not self._is_token_valid(self.__accessTokenPayload):
             self.__tokenData = self._do_refresh(self.__config, self.__tokenData)
             self.__accessTokenPayload = self._get_access_token_payload(self.__tokenData)
