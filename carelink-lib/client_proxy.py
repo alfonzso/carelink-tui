@@ -214,19 +214,20 @@ class MyServer(BaseHTTPRequestHandler):
         query_params = parse_qs(urlparse(self.path).query)
         log.debug(query_params)
 
-        _path = self.path.split("?")[0].strip("/")
+        # _path = self.path.split("?")[0].strip("/")
+        _path = self.path.split("?")[0]
         log.debug(f"with path {_path}")
 
         # Check request path
-        if _path == APIURL:
+        if _path.strip("/") == APIURL:
             response = json.dumps(recentData)
             status_code = HTTPStatus.OK
             content_type = "application/json"
-        elif _path == f"{APIURL}/nohistory":
+        elif _path.strip("/") == f"{APIURL}/nohistory":
             response = json.dumps(get_essential_data(recentData))
             status_code = HTTPStatus.OK
             content_type = "application/json"
-        elif _path == f"{APIURL}/get-last-bsd":
+        elif _path.strip("/") == f"{APIURL}/get-last-bsd":
             _last_n = int(query_params.get("last-n", ["0"])[0])
             _last_n = (_last_n and _last_n > 0) and _last_n or 10
             response = json.dumps(
@@ -234,7 +235,7 @@ class MyServer(BaseHTTPRequestHandler):
             )
             status_code = HTTPStatus.OK
             content_type = "application/json"
-        elif _path == f"{APIURL}/get-current-bsd":
+        elif _path.strip("/") == f"{APIURL}/get-current-bsd":
             response = json.dumps(carelink_get_current_blood_sugar_level(recentData))
             status_code = HTTPStatus.OK
             content_type = "application/json"
