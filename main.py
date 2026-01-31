@@ -182,22 +182,6 @@ class CareLink:
         # this logic implemted at client_proxy file
         raise NotImplemented
 
-    def get_carelink_last_n_blood_sugar_data(self, n=10):
-        url = f"http://alfoldi-nokia.lan:8081/carelink/get-last-bsd?last-n={n}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            # print(data)
-        return data
-
-    def get_carelink_current_blood_sugar_level(self):
-        url = "http://alfoldi-nokia.lan:8081/carelink/get-current-bsd"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            print(data)
-        return data
-
     def save_cookie(self):
         with open("py_cookie_jar", "wb") as f:
             pickle.dump(self._session.cookies, f)
