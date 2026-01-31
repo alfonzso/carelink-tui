@@ -34,24 +34,28 @@
 ###############################################################################
 
 import argparse
+import copy
 import json
-import logging as log
+import logging
 import signal
 import sys
 import threading
 import time
+from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import client
+# from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-# from urllib.parse import parse_qs
+import client
 
 VERSION = "1.2"
 
 # Logging config
 FORMAT = "[%(asctime)s:%(levelname)s] %(message)s"
-log.basicConfig(format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S", level=log.INFO)
+logging.basicConfig(format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+log = logging.getLogger(__name__)
 
 # HTTP server settings
 HOSTNAME = "0.0.0.0"
@@ -90,10 +94,36 @@ def on_sigterm(signum, frame):
 #################################################
 # Get only essential data from json
 #################################################
+
+
+def carelink_get_last_n_blood_sugar_data(data, n=10):
+    log.debug("LOG: get last n")
+    _data = copy.deepcopy(data)
+    sgs = _data.get("sgs")[n * -1 :]
+    for sg in sgs:
+        _datetime = sg.get("datetime", None)
+        if _datetime:
+            log.debug(_datetime)
+            sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
+        sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
+    return sgs
+
+
+def carelink_get_current_blood_sugar_level(data):
+    log.debug("LOG: get current bs")
+    _data = copy.deepcopy(data)
+    sg = _data.get("sgs")[-1].get("sg") or None
+    assert sg, "carelink_get_current_blood_sugar_level: sgs->sg is None"
+    return round(sg / 18, 1)
+
+
 def get_essential_data(data):
     mydata = ""
     if data != None:
-        mydata = data["patientData"].copy()
+        try:
+            mydata = copy.deepcopy(data["patientData"])
+        except (KeyError, TypeError):
+            mydata = data.copy()
         try:
             del mydata["sgs"]
         except (KeyError, TypeError):
@@ -159,23 +189,35 @@ class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         # Security checks (if any)
         # TODO
-        log.debug("received client GET request from %s" % (self.address_string()))
-        # print(self.path)
+        log.debug(f"received client GET request from {self.address_string()}")
+        query_params = parse_qs(urlparse(self.path).query)
+        log.debug(query_params)
+
+        _path = self.path.split("?")[0].strip("/")
+        log.debug(f"with path {_path}")
 
         # Check request path
-        if self.path.strip("/") == APIURL:
-            # Get latest Carelink data (complete)
+        if _path == APIURL:
             response = json.dumps(recentData)
             status_code = HTTPStatus.OK
             content_type = "application/json"
-            # print("All data requested")
-        elif self.path.strip("/") == APIURL + "/" + OPT_NOHISTORY:
-            # Get latest Carelink data without history
+        elif _path == f"{APIURL}/nohistory":
             response = json.dumps(get_essential_data(recentData))
             status_code = HTTPStatus.OK
             content_type = "application/json"
-            # print("Only essential data requested")
-        elif self.path == "/":
+        elif _path == f"{APIURL}/get-last-bsd":
+            _last_n = int(query_params.get("last-n", ["0"])[0])
+            _last_n = (_last_n and _last_n > 0) and _last_n or 10
+            response = json.dumps(
+                carelink_get_last_n_blood_sugar_data(recentData, _last_n)
+            )
+            status_code = HTTPStatus.OK
+            content_type = "application/json"
+        elif _path == f"{APIURL}/get-current-bsd":
+            response = json.dumps(carelink_get_current_blood_sugar_level(recentData))
+            status_code = HTTPStatus.OK
+            content_type = "application/json"
+        elif _path == "/":
             # Show web GUI
             if g_status == STATUS_NEED_TKN:
                 response = webgui(status=g_status, action=GUIURL)
@@ -199,46 +241,6 @@ class MyServer(BaseHTTPRequestHandler):
             self.wfile.write(bytes(response, "utf-8"))
         except BrokenPipeError:
             pass
-
-    """
-   def do_POST(self):
-      # Get request body
-      content_length = int(self.headers['Content-Length'])
-      body = self.rfile.read(content_length)
-      log.debug("received client POST request from %s" % (self.address_string()))
-      #print(body)
-
-      # Check request path
-      if self.path.strip("/") == GUIURL:
-         # Save setup data
-         try:
-            qs = body.decode()
-            token = parse_qs(qs)['ftoken'][0]
-            country = parse_qs(qs)['fcountry'][0]
-            if token == "" or token == None:
-               raise
-            save_params(token,country)
-            time.sleep(2)
-            response = webgui(status=g_status)
-         except:
-            response = webgui(status=g_status, action=GUIURL)
-         status_code = HTTPStatus.OK
-         content_type = "text/html"
-         #print("Config data received")
-      else:
-         response = ""
-         status_code = HTTPStatus.NOT_FOUND
-
-      # Send response
-      self.send_response(status_code)
-      self.send_header("Content-type", content_type)
-      self.send_header("Access-Control-Allow-Origin", "*")
-      self.end_headers()
-      try:
-         self.wfile.write(bytes(response, "utf-8"))
-      except BrokenPipeError:
-         pass
-   """
 
 
 #################################################
@@ -288,7 +290,9 @@ verbose = args.verbose
 
 # Logging config (verbose)
 if verbose:
-    log.basicConfig(level=log.DEBUG)
+    log.setLevel(logging.DEBUG)
+
+log.addHandler(logging.StreamHandler())
 
 log.info("Starting Carelink Client Proxy (version %s)" % VERSION)
 

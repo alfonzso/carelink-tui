@@ -176,7 +176,10 @@ class CareLink:
         for sg in sgs:
             _datetime = sg.get("datetime", None)
             if _datetime:
-                sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
+                try:
+                    sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
+                except Exception:
+                    print(_datetime)
             sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
         return sgs
 

@@ -244,7 +244,6 @@ class CareLinkClient(object):
         url = base_url + "/patient/connect/data"
         params = {"cpSerialNumber": "NONE", "msgType": "last24hours"}
         resp = requests.get(url=url, headers=headers, params=params)
-        print(resp.json())
         return resp
 
     ###########################################################

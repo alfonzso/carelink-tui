@@ -12,7 +12,8 @@ dependencies = [
     "pyopenssl (==24.0.0)",
     "requests (==2.31.0)",
     "selenium-wire (==5.1.0)",
-    "blinker (==1.7.0)"
+    "blinker (==1.7.0)",
+    "setuptools (>=80.10.2,<81.0.0)"
 ]
 
 [dependency-groups]
