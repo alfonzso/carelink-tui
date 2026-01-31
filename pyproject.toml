@@ -13,14 +13,15 @@ dependencies = [
     "requests (==2.31.0)",
     "selenium-wire (==5.1.0)",
     "blinker (==1.7.0)",
-    "setuptools (>=80.10.2,<81.0.0)"
+    "setuptools (>=80.10.2,<81.0.0)",
 ]
 
 [dependency-groups]
 dev = [
     "isort (>=7.0.0,<8.0.0)",
     "black (>=26.1.0,<27.0.0)",
-    "poetry-add-requirements-txt (>=1.5.4,<2.0.0)"
+    "poetry-add-requirements-txt (>=1.5.4,<2.0.0)",
+    "rust-just (>=1.46.0,<2.0.0)"
 ]
 
 

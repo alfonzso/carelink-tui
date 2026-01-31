@@ -1,0 +1,7 @@
+# ignore everything
+**
+
+!poetry.lock
+!pyproject.toml
+!carelink-lib/client.py
+!carelink-lib/client_proxy.py
