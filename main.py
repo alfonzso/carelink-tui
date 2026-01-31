@@ -171,21 +171,32 @@ class CareLink:
         return self.send_request(_req_obj)
 
     def carelink_get_last_n_blood_sugar_data(self, n=10):
-        print(datetime.now(), "LOG: get last n")
-        sgs = self.patient_data.json().get("sgs")[n * -1 :]
-        for sg in sgs:
-            _datetime = sg.get("datetime", None)
-            if _datetime:
-                try:
-                    sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
-                except Exception:
-                    print(_datetime)
-            sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
-        return sgs
+        # NOTE: removed cuz it only worked without captchas
+        # use carelink-lib sources to get data
+        # this logic implemted at client_proxy file
+        raise NotImplemented
 
     def carelink_get_current_blood_sugar_level(self):
-        print(datetime.now(), "LOG: get current bs")
-        return round((self.patient_data.json().get("sgs")[-1]).get("sg") / 18, 1)
+        # NOTE: removed cuz it only worked without captchas
+        # use carelink-lib sources to get data
+        # this logic implemted at client_proxy file
+        raise NotImplemented
+
+    def get_carelink_last_n_blood_sugar_data(self, n=10):
+        url = f"http://alfoldi-nokia.lan:8081/carelink/get-last-bsd?last-n={n}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            # print(data)
+        return data
+
+    def get_carelink_current_blood_sugar_level(self):
+        url = "http://alfoldi-nokia.lan:8081/carelink/get-current-bsd"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            print(data)
+        return data
 
     def save_cookie(self):
         with open("py_cookie_jar", "wb") as f:
