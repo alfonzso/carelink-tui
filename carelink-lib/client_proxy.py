@@ -28,8 +28,9 @@
 #    03/01/2024 - Porting to Carelink Client 2
 #    11/04/2024 - Handle reconnection in case of network error
 #    17/01/2025 - Adapt get_essential_data() to new data format
+#    31/01/2026 - Refactor and added own functions + container
 #
-#  Copyright 2021-2025, Ondrej Wisniewski
+#  Copyright 2021-2025, Ondrej Wisniewski, Zsolt Alfoldi
 #
 ###############################################################################
 
@@ -44,13 +45,11 @@ import time
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-# from urllib.parse import urlparse
 from urllib.parse import parse_qs, urlparse
 
 import client
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # Logging config
 FORMAT = "[%(asctime)s:%(levelname)s] %(message)s"
@@ -79,7 +78,14 @@ STATUS_NEED_TKN = "Valid token required"
 g_status = STATUS_INIT
 
 recentData = None
+TRACE_LEVEL = 2
 verbose = False
+verbose_level = 1
+
+
+def trace(msg: str):
+    if verbose_level >= TRACE_LEVEL:
+        log.debug(f"TRACE: {str(msg)}")
 
 
 #################################################
@@ -96,25 +102,40 @@ def on_sigterm(signum, frame):
 #################################################
 
 
-def carelink_get_last_n_blood_sugar_data(data, n=10):
-    log.debug("LOG: get last n")
-    _data = copy.deepcopy(data)
-    sgs = _data.get("sgs")[n * -1 :]
-    for sg in sgs:
-        _datetime = sg.get("datetime", None)
-        if _datetime:
-            log.debug(_datetime)
-            sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
-        sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
-    return sgs
+def carelink_get_last_n_blood_sugar_data(data, n=10, mmol=True):
+    """
+    Get last 'n' bloodsugar data
+    -> fixing datetime to epoch
+    -> convert sg value to mmol/L
+    """
+    try:
+        log.debug("LOG: get last n")
+        _data = copy.deepcopy(data)
+        sgs = _data.get("sgs")[n * -1 :]
+        for sg in sgs:
+            _datetime: str | None = sg.get("datetime", None)
+            if _datetime:
+                trace(_datetime)
+                sg["datetime"] = int(datetime.fromisoformat(_datetime).timestamp())
+            if mmol:
+                sg["sg"] = round(int(sg.get("sg", 0)) / 18, 1)
+        return sgs
+    except Exception as e:
+        log.debug(e)
+        return []
 
 
 def carelink_get_current_blood_sugar_level(data):
-    log.debug("LOG: get current bs")
-    _data = copy.deepcopy(data)
-    sg = _data.get("sgs")[-1].get("sg") or None
-    assert sg, "carelink_get_current_blood_sugar_level: sgs->sg is None"
-    return round(sg / 18, 1)
+    try:
+        log.debug("LOG: get current bs")
+        _data = copy.deepcopy(data)
+        sg = _data.get("sgs")[-1].get("sg") or None
+        if not sg:
+            raise ValueError("sg cannot be None")
+        return round(sg / 18, 1)
+    except Exception as e:
+        log.debug(e)
+        return 0
 
 
 def get_essential_data(data):
@@ -281,6 +302,9 @@ parser.add_argument(
     required=False,
 )
 parser.add_argument("--verbose", "-v", help="Verbose mode", action="store_true")
+parser.add_argument(
+    "--verbose-level", "-l", help="Verbose level", type=int, required=False
+)
 args = parser.parse_args()
 
 # Get parameters from CLI
@@ -288,11 +312,16 @@ tokenfile = TOKENFILE if args.tokenfile == None else args.tokenfile
 wait = UPDATE_INTERVAL if args.wait == None else args.wait
 verbose = args.verbose
 
+print(args.verbose_level)
+
+if args.verbose_level:
+    verbose_level = args.verbose_level
+
 # Logging config (verbose)
 if verbose:
     log.setLevel(logging.DEBUG)
 
-log.addHandler(logging.StreamHandler())
+# log.addHandler(logging.StreamHandler())
 
 log.info("Starting Carelink Client Proxy (version %s)" % VERSION)
 
