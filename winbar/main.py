@@ -53,12 +53,9 @@ class APPBARDATA(ctypes.Structure):
 ###########################################
 
 index = 0
-cl = CareLink()
-cl.main()
+# cl = CareLink()
+# cl.main()
 last_46_sg = []
-# [
-#     sgs.get("sg", 0) for idx, sgs in enumerate(cl.carelink_get_last_n_blood_sugar_data(45)) if idx % 2 == 0
-# ]
 
 ###########################################
 ###########################################
@@ -362,7 +359,7 @@ def main():
 
     def update_status():
         global index
-        global cl
+        # global cl
         """Update system status"""
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
@@ -389,7 +386,8 @@ def main():
             _max = max(_last_n)
             _last_n_res = [
                 sgs.get("sg", 0)
-                for sgs in cl.carelink_get_last_n_blood_sugar_data(_max)
+                # for sgs in cl.carelink_get_last_n_blood_sugar_data(_max)
+                for sgs in get_carelink_last_n_blood_sugar_data(_max)
             ]
 
             def _calc():
@@ -405,10 +403,11 @@ def main():
                 yield round(sum(src[x : x + step]) / step, 1)
 
         if index >= 60 * 2 or index == 0:
-            cl.main()
+            # cl.main()
             _diag_3h = bar.widgets[4]
             _diag_1h = bar.widgets[5]
-            current_bs = cl.carelink_get_current_blood_sugar_level()
+            # current_bs = cl.carelink_get_current_blood_sugar_level()
+            current_bs = get_carelink_current_blood_sugar_level()
             bar.widgets[3].setText(str(current_bs))
 
             last_46_sg, last_15_sg = get_sg_list([45, 15])
@@ -427,12 +426,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
-
-if __name__ == "__main__":
-    main()
-
-
-if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        with open("kek_crash.log", "w", encoding="utf-8") as f:
+            traceback.print_exc(file=f)
+        raise
