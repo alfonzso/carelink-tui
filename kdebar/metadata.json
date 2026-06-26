@@ -1,0 +1,22 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "alfonzso@gmail.com",
+                "Name": "Zsolt Alfoldi"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Show CareLink blood sugar readings and compact history graphs in a KDE Plasma panel.",
+        "Icon": "office-chart-line",
+        "Id": "net.lehel.carelink.kdebar",
+        "License": "MIT",
+        "Name": "CareLink KDE Bar",
+        "Version": "0.1.0",
+        "Website": "https://github.com/alfonzso/carelink-tui"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

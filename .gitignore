@@ -5,3 +5,4 @@ cookie_jar.txt
 .venv
 logindata.json
 **cache**
+dist

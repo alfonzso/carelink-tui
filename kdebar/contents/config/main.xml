@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      https://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <entry name="proxyBaseUrl" type="String">
+            <label>CareLink proxy base URL.</label>
+            <default>http://carelink.lehel.net</default>
+        </entry>
+        <entry name="refreshIntervalSeconds" type="Int">
+            <label>Seconds between CareLink proxy refreshes.</label>
+            <default>120</default>
+            <min>15</min>
+            <max>3600</max>
+        </entry>
+        <entry name="longHistorySize" type="Int">
+            <label>Number of readings for the long graph.</label>
+            <default>45</default>
+            <min>2</min>
+            <max>288</max>
+        </entry>
+        <entry name="shortHistorySize" type="Int">
+            <label>Number of readings for the short graph.</label>
+            <default>15</default>
+            <min>2</min>
+            <max>288</max>
+        </entry>
+    </group>
+</kcfg>
